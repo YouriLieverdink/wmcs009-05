@@ -86,3 +86,113 @@ In order to convert to 3NF, we need to remove all transitive dependencies. Curre
 # Task 1.2
 
 TODO
+
+# Task 2.1
+
+### Log changes made to critical fields
+
+```sql
+CREATE TRIGGER log_customers_changes
+AFTER UPDATE ON Customers
+FOR EACH ROW
+BEGIN
+  IF OLD.CustomerName <> NEW.CustomerName THEN
+    INSERT INTO CustomersChangesLog (CustomerId, OldCustomerName, NewCustomerName, Timestamp)
+    VALUES (NEW.CustomerId, OLD.CustomerName, NEW.CustomerName, NOW());
+  END IF;
+END;
+
+CREATE TRIGGER log_books_changes
+AFTER UPDATE ON Books
+FOR EACH ROW
+BEGIN
+  IF OLD.BookPrice <> NEW.BookPrice THEN
+    INSERT INTO BooksChangesLog (BookTitle, OldBookPrice, NewBookPrice, Timestamp)
+    VALUES (NEW.BookTitle, OLD.BookPrice, NEW.BookPrice, NOW());
+  END IF;
+END;
+
+CREATE TRIGGER log_orders_changes
+AFTER UPDATE ON Orders
+FOR EACH ROW
+BEGIN
+  IF OLD.DeliveryAddress <> NEW.DeliveryAddress THEN
+    INSERT INTO OrdersChangesLog (OrderId, OldDeliveryAddress, NewDeliveryAddress, Timestamp)
+    VALUES (NEW.OrderId, OLD.DeliveryAddress, NEW.DeliveryAddress, NOW())
+  END IF;
+END;
+```
+
+### Prevent deletion of records that are referenced by other tables
+
+```sql
+CREATE TRIGGER preventCustomerDelete
+BEFORE DELETE ON Customers
+FOR EACH ROW
+BEGIN
+  IF EXISTS(
+    SELECT * FROM Orders
+    WHERE CustomerId = OLD.CustomerId
+  ) THEN
+    SIGNAL SQLSTATE = '23511'
+    SET MESSAGE_TEXT = 'Cannot delete customer with existing orders';
+  END IF;
+END;
+
+CREATE TRIGGER preventBookDelete
+BEFORE DELETE ON Books
+FOR EACH ROW
+BEGIN
+  IF EXISTS(
+    SELECT * FROM Orders
+    WHERE BookTitle = OLD.BookTitle
+  ) THEN
+    SIGNAL SQLSTATE = '23511'
+    SET MESSAGE_TEXT = 'Cannot delete book with existing orders';
+  END IF;
+END;
+
+CREATE TRIGGER preventAddressDelete
+BEFORE DELETE ON Addresses
+FOR EACH ROW
+BEGIN
+  IF EXISTS(
+    SELECT * FROM Orders
+    WHERE DeliveryAddress = OLD.DeliveryAddress
+  ) THEN
+    SIGNAL SQLSTATE = '23511'
+    SET MESSAGE_TEXT = 'Cannot delete delivery address with existing orders';
+  END IF;
+END;
+```
+
+### Automatically update reports in "MonthlySalesReport"
+
+```sql
+
+CREATE TRIGGER setMonthlySalesReport
+AFTER INSERT ON Orders
+FOR EACH ROW
+BEGIN
+		INSERT INTO MonthlySalesReport (Month, BookTitle, Sales)
+		SELECT
+      EXTRACT(MONTH FROM Orders.OrderDate) AS Month,
+      Books.BookTitle,
+      SUM(Books.BookPrice) as Sales
+    FROM 
+      Orders
+    JOIN
+      Books ON Orders.BookTitle = Books.BookTitle
+    WHERE
+      Books.BookTitle = NEW.BookTitle
+    GROUP BY
+      EXTRACT(MONTH FROM Orders.OrderDate),
+      Books.BookTitle
+		ON DUPLICATE KEY UPDATE
+        Sales = VALUES(Sales);
+END;
+```
+
+### Task 2.2
+
+TODO
