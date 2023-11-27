@@ -196,3 +196,63 @@ END;
 ### Task 2.2
 
 TODO
+
+### Task 3.1
+
+```sql
+CREATE FUNCTION calculate_total_order_value (CustomerId VARCHAR(255))
+RETURNS INTEGER DETERMINISTIC
+BEGIN
+	DECLARE total_value INTEGER DEFAULT 0;
+  
+  SELECT SUM(Books.BookPrice)
+  INTO total_value
+  FROM Orders
+  JOIN Books 
+  ON Orders.BookTitle = Books.BookTitle
+  WHERE Orders.CustomerId = CustomerId;  	
+   
+  RETURN total_value;
+END;
+
+CREATE FUNCTION list_unique_books()
+RETURNS VARCHAR(255) DETERMINISTIC
+BEGIN
+    DECLARE unique_books VARCHAR(255) DEFAULT '';
+    
+    SET @books = '';
+    SELECT
+        MAX(
+          @books := IF(
+            LOCATE(BookTitle, @books) = 0,
+            CONCAT_WS(' ', @books, BookTitle),
+            CONCAT(@books)
+          ) 
+        )
+       as unique_books
+    FROM Orders
+		INTO unique_books;
+    
+	  RETURN unique_books;
+END;
+
+CREATE FUNCTION update_order_prices(Percentage DECIMAL(2, 1))
+RETURNS INTEGER DETERMINISTIC
+BEGIN
+	UPDATE Books
+  SET BookPrice = BookPrice * Percentage;
+  
+  RETURN 0;
+END;
+```
+
+# Task 3.2
+
+```sql
+SELECT CustomerId, calculate_total_order_value(CustomerId)
+FROM Customers;
+
+SELECT list_unique_books();
+
+SELECT update_order_prices(0.5);
+```
